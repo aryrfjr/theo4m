@@ -1,0 +1,19 @@
+# -*- coding: utf-8 -*-
+"""
+
+    Read NMRAtoms object(s) from file.
+
+    =======================================  ================
+     Package                                  Method
+    =======================================  ================
+     Quantum Espresso GIPAW output files      read_qe
+    =======================================  ================
+
+"""
+
+__all__ = ['read_qe']
+
+def read_qe(rundir, prefix, symbs, qms, isotps, nuclspins, pnmr, pefg):
+    from aseext.nmr.io.qe import read_qe
+    return read_qe(rundir, prefix, symbs, qms, isotps, nuclspins, pnmr, pefg)
+

@@ -1,0 +1,99 @@
+# -*- coding: utf-8 -*-
+"""No, this is not a plagiarism from ase.io.
+"""
+
+# http://docs.scipy.org/doc/numpy/
+from numpy import array, dot
+# from this same package
+from aseext.nmr.nmratoms import NMRAtoms
+
+__all__ = [
+        'read_qe',
+        ]
+
+def read_qe(rundir, prefix, symbs, qms, isotps, nuclspins, pnmr, pefg):
+    """Reads the pw.x output file and the gipaw.x output files for 
+       the nmr and efg tasks, returning a nmratoms object."""
+    pwfile = rundir + '/'+prefix+'.pw.out'
+    nmrfile = rundir + '/'+prefix+'-nmr.gipaw.out'
+    efgfile = rundir + '/'+prefix+'-efg.gipaw.out'
+    # parsing the SCF output file
+    fileobj = open(pwfile)
+    lines = fileobj.readlines()
+    fileobj.close()
+    for i, line in enumerate(lines):
+        if 'number of atoms/cell' in line:
+        # Reading the number of atoms in the cell
+            nat = int(line.split()[4])
+        elif 'number of atomic types' in line:
+            ntypat = int(line.split()[5])
+        elif 'crystal axes: (cart. coord. in units of alat)' in line:
+        # Reading the cell vectors
+            cell = [x.split()[3:6] for x in lines[i + 1:i + 4]]
+            cell = array([[float(col) for col in row] for row in cell])
+        elif 'Crystallographic axes' in line:
+        # Reading the atoms and creating a collection of NMRAtoms objects
+            geom_start = i + 3
+            geom_stop = geom_start + nat
+            species = [line.split()[1] for line in lines[geom_start:geom_stop]]
+            geom = dot(array([[float(col) for col in line.split()[6:9]]
+                for line in lines[geom_start:geom_stop]]), cell)
+            atoms = NMRAtoms(
+                cell=cell,
+                pbc=True,
+                positions=geom,
+                symbols=''.join(species),
+                )
+            atoms.set_theory('GIPAW')
+            atoms.set_code('qe')
+            atoms.set_number_elements(ntypat)
+            atoms.set_has_efg(pefg)
+            if pefg: atoms.set_quadrupolar_info(symbs, qms, isotps, nuclspins)
+        elif 'number of k points=' in line:
+        # Reading the number of k-poins
+            atoms.set_number_kpoints(int(line.split()[4]))
+        elif line.startswith('!'):
+        # Reading the total energy
+            atoms.set_total_energy(float(line.split()[4]))
+    # parsing the NMR task output file
+    #if pnmr: print nmrfile
+        # Now, computing NMR spectral parameters
+        #atoms.compute_nmr()
+    # parsing the EFG task output file
+    if pefg:
+        fileobj = open(efgfile)
+        lines = fileobj.readlines()
+        fileobj.close()
+        for i, line in enumerate(lines):
+            if '----- bare EFG (symmetrized) -----' in line:
+                il = i + 1
+                for iat in range(atoms.get_number_of_atoms()):
+                    nucl = atoms.get_nmrnucleus(iat)
+                    efg_bare = array([[float(col) for col in line.split()[2:5]] for line in lines[il:il + 3]])
+                    nucl.set_efg_bare(efg_bare)
+                    il = il + 4
+            elif '----- ion EFG (symmetrized) -----' in line:
+                il = i + 1
+                for iat in range(atoms.get_number_of_atoms()):
+                    nucl = atoms.get_nmrnucleus(iat)
+                    efg_ion = array([[float(col) for col in line.split()[2:5]] for line in lines[il:il + 3]])
+                    nucl.set_efg_ion(efg_ion)
+                    il = il + 4
+            elif '----- GIPAW EFG (symmetrized) -----' in line:
+                il = i + 1
+                for iat in range(atoms.get_number_of_atoms()):
+                    nucl = atoms.get_nmrnucleus(iat)
+                    efg_aug = array([[float(col) for col in line.split()[2:5]] for line in lines[il:il + 3]])
+                    nucl.set_efg_aug(efg_aug)
+                    il = il + 4
+            elif '----- total EFG (symmetrized) -----' in line:
+                il = i + 1
+                for iat in range(atoms.get_number_of_atoms()):
+                    nucl = atoms.get_nmrnucleus(iat)
+                    efg = array([[float(col) for col in line.split()[2:5]] for line in lines[il:il + 3]])
+                    nucl.set_efg(efg)
+                    il = il + 4
+        # Now, computing EFG spectral parameters
+        atoms.compute_efg()
+    return atoms
+
