@@ -104,7 +104,7 @@ def __process_item__(i, lines, spc_symbs, frac):
     atoms = Atoms(cell=ocell,pbc=True)
     for i in range(nat):
         atoms.append(Atom(ca_symbs[i], geom[i], tag=ca_ids[i]))
-    return step, atoms
+    return step, atoms, ocell
 
 # Reading the .dump file
 def __dump_atom__all__(lmpdump_file, items, spc_symbs, frac):
@@ -113,21 +113,24 @@ def __dump_atom__all__(lmpdump_file, items, spc_symbs, frac):
     fileobj.close()
     rsteps = []
     ratoms = []
+    rcell = []
     iitem = 1
     if items[0] == -2: # only the last item
         nati = int(lines[3].split()[0]) # the number of atoms of the first item
         il = len(lines) - (nati + 9)
-        istep, iatoms = __process_item__(il, lines, spc_symbs, frac)
+        istep, iatoms, icell = __process_item__(il, lines, spc_symbs, frac)
         rsteps.append(istep)
         ratoms.append(iatoms)
+        rcell.append(icell)
     else:
         for il, line in enumerate(lines):
             if "ITEM: TIMESTEP" in line:
                 if items[0] == -1 or iitem in items:
-                    istep, iatoms = __process_item__(il, lines, spc_symbs, frac)
+                    istep, iatoms, icell = __process_item__(il, lines, spc_symbs, frac)
                     print ("Reading step # %s ..." % istep)
                     rsteps.append(istep)
                     ratoms.append(iatoms)
+                    rcell.append(icell)
                 iitem += 1
-    return rsteps, ratoms
+    return rsteps, ratoms, rcell
 
